@@ -1,56 +1,111 @@
+
+import numpy as np
 from openalpr import Alpr
+import requests as req
+import json
 import cv2
+import time
+import os
+import distance
+
+plate_nums=[]
+lastNum = "phony"
+lot= "1b"
+pi_name= "Pi-1"
 alpr = Alpr("us", "/usr/share/openalpr/config/openalpr.defaults.conf", "/usr/share/openalpr/runtime_data")
 if not alpr.is_loaded():
     print("Error loading OpenALPR")
     #sys.exit(1)
 
+##variable for the plate and frame
+p= ""
+c = ""
+
+url="https://aj677mha43.execute-api.us-east-1.amazonaws.com/Beta/check_plate"
+
 alpr.set_top_n(20)
 alpr.set_default_region("md")
 
-cam = cv2.VideoCapture(0)
+#cv2.destroyAllWindows()
+def recognize(filename="test2.jpg"):
 
-cv2.namedWindow("test")
 
-img_counter = 0
 
-while True:
-    ret, frame = cam.read()
-    cv2.imshow("test", frame)
-    if not ret:
-        break
-    k = cv2.waitKey(1)
+    
+    results = alpr.recognize_file(filename)
+    print(results)
 
-  
+    try:
+        p= results['results'][0][u'plate']
+        c= results['results'][0][u'confidence']
+        print(p + " : " + str(c))
+        if len(plate_nums)<5:
+            plate_nums.append(p)
+        elif len(plate_nums)==5:
+            if plate_nums[0] == plate_nums[4] and lastNum != p:
+                req.post(url,data=json.dumps({'plate': p,'conf': c, 'name': pi_name, 'lot':lot}))
+                plate_nums=[]
+                lastNum=p
+            
+                
+            
+
         
-    if k%256 == 32:
-        # SPACE pressed
-        img_name = "test1.jpg".format(img_counter)
-        cv2.imwrite(img_name, frame)
-        print("{} written!".format(img_name))
-        img_counter += 1
-        print("Escape hit, closing...")
-        break
+        alpr.unload()
+        
+     
+        
+    except:
+       req.post(url, data=json.dumps({'plate':'404','conf':'404'}))
+       plate_nums.append('404')
+       print('error')
+def camera():
+    cap = cv2.VideoCapture(-1) # video capture source camera (Here webcam of laptop) 
+    ret,frame = cap.read() # return a single frame in variable `frame`
 
-cam.release()
 
-cv2.destroyAllWindows()
-print("Reached here")
+    
+    #cv2.imshow('img1',frame) #display the captured image
+    try:
+        print("writing file")
+        print(cv2.imwrite('test2.jpg',frame))
+    except:
+        print("file not written")
+    cv2.destroyAllWindows()
+        
 
-results = alpr.recognize_file("test1.jpg")
-i = 0
-for plate in results['results']:
-    i += 1
-    print("Plate #%d" % i)
-    print("   %12s %12s" % ("Plate", "Confidence"))
-    for candidate in plate['candidates']:
-        prefix = "-"
-        if candidate['matches_template']:
-            prefix = "*"
+    cap.release()
+    
+    time.sleep(5)
+    recognize()          
 
-        print("  %s %12s%12f" % (prefix, candidate['plate'], candidate['confidence']))
-        #break;
-# Call when completely done to release memory
-alpr.unload()
+
+
+               
+                
+            
+    # Call when completely done to release memory
+    
+#get distnce
+while(1):
+    dist=distance.distancefunc();
+    print(dist); 
+    if(dist):
+        camera()
+        
+        
+        
+    
+   
+    #print("counting started");
+    #time.sleep(30);
+
+
+
+ 
+
+
+#camera()
+#recognize(filename)
 
 
